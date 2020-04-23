@@ -28,44 +28,44 @@ data "vsphere_virtual_machine" "node_template" {
 }
 
 resource "vsphere_virtual_machine" "nodes" {
-  count            = "${var.node_count}"
+  count            = var.node_count
   name             = "${var.node_prefix}${var.node_name}${count.index}"
-  datastore_id     = "${data.vsphere_datastore.node_datastore.id}"
-  resource_pool_id = "${data.vsphere_resource_pool.node_pool.id}"
-  num_cpus         = "${var.node_cpus}"
-  memory           = "${var.node_memory}"
-  guest_id         = "${data.vsphere_virtual_machine.node_template.guest_id}"
-  scsi_type        = "${data.vsphere_virtual_machine.node_template.scsi_type}"
+  datastore_id     = data.vsphere_datastore.node_datastore.id
+  resource_pool_id = data.vsphere_resource_pool.node_pool.id
+  num_cpus         = var.node_cpus
+  memory           = var.node_memory
+  guest_id         = data.vsphere_virtual_machine.node_template.guest_id
+  scsi_type        = data.vsphere_virtual_machine.node_template.scsi_type
   annotation       = "Created on blah" #TODO: Add info here, date and source template
 
   disk {
-    label            = "${var.node_prefix}${var.node_name}${count.index}.vmdk"
-    size             = "${var.node_disk_size}"
-    eagerly_scrub    = "${data.vsphere_virtual_machine.node_template.disks.0.eagerly_scrub}"
-    thin_provisioned = "${data.vsphere_virtual_machine.node_template.disks.0.thin_provisioned}"
+    label            = "${var.node_prefix}${var.node_name}${count.index}$.vmd"
+    size             = var.node_disk_size
+    eagerly_scrub    = data.vsphere_virtual_machine.node_template.disks.0.eagerly_scrub
+    thin_provisioned = data.vsphere_virtual_machine.node_template.disks.0.thin_provisioned
   }
 
   network_interface {
-    network_id = "${data.vsphere_network.node_network.id}"
+    network_id = data.vsphere_network.node_network.id
   }
 
   clone {
-    template_uuid = "${data.vsphere_virtual_machine.node_template.id}"
+    template_uuid = data.vsphere_virtual_machine.node_template.id
     #TODO: Complete this for non-cloud-init enabled templates like Windows
     dynamic "customize" {
       for_each = var.cloud_init ? [] : [1]
       content {
         linux_options {
           host_name = "${var.node_prefix}${var.node_name}${count.index}"
-          domain    = "${var.node_domain_name}"
+          domain    = var.node_domain_name
         }
 
         network_interface {
-          ipv4_address = "${var.node_ips[count.index]}"
+          ipv4_address = var.node_ips[count.index]
           #ipv4_netmask = 24
         }
 
-        ipv4_gateway = "${var.node_gateway}"
+        ipv4_gateway = var.node_gateway
       }
     }
   }
@@ -127,16 +127,16 @@ data "template_file" "network_config" {
 }
 
 resource "vsphere_compute_cluster_vm_anti_affinity_rule" "node_anti_affinity" {
-  count               = "${var.anti_affinity_enabled ? 1 : 0}"
+  count               = var.anti_affinity_enabled ? 1 : 0
   name                = "${var.node_prefix}${var.node_name}-anti-affinity"
-  compute_cluster_id  = "${data.vsphere_compute_cluster.node_cluster.id}"
-  virtual_machine_ids = "${vsphere_virtual_machine.nodes.*.id}"
+  compute_cluster_id  = data.vsphere_compute_cluster.node_cluster.id
+  virtual_machine_ids = vsphere_virtual_machine.nodes.*.id
 }
 
 resource "dns_a_record_set" "a_record" {
-  count     = "${var.node_count}"
+  count     = var.node_count
   zone      = "${var.node_domain_name}."
   name      = "${var.node_prefix}${var.node_name}${count.index}"
-  addresses = [ "${split("/", var.node_ips[count.index])[0]}" ]
+  addresses = ["${split("/", var.node_ips[count.index])[0]}"]
   ttl       = 3600
 }
