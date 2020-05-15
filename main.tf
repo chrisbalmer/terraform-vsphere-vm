@@ -18,8 +18,9 @@ data "vsphere_datastore" "node_datastore" {
 }
 
 data "vsphere_network" "node_network" {
+  count         = length(var.vsphere_network)
   datacenter_id = "${data.vsphere_datacenter.node_dc.id}"
-  name          = "${var.vsphere_network}"
+  name          = "${var.vsphere_network[count.index]}"
 }
 
 data "vsphere_virtual_machine" "node_template" {
@@ -28,15 +29,16 @@ data "vsphere_virtual_machine" "node_template" {
 }
 
 resource "vsphere_virtual_machine" "nodes" {
-  count            = var.node_count
-  name             = "${var.node_prefix}${var.node_name}${count.index}"
-  datastore_id     = data.vsphere_datastore.node_datastore.id
-  resource_pool_id = data.vsphere_resource_pool.node_pool.id
-  num_cpus         = var.node_cpus
-  memory           = var.node_memory
-  guest_id         = data.vsphere_virtual_machine.node_template.guest_id
-  scsi_type        = data.vsphere_virtual_machine.node_template.scsi_type
-  annotation       = "Created on blah" #TODO: Add info here, date and source template
+  count                      = var.node_count
+  name                       = "${var.node_prefix}${var.node_name}${count.index}"
+  datastore_id               = data.vsphere_datastore.node_datastore.id
+  resource_pool_id           = data.vsphere_resource_pool.node_pool.id
+  num_cpus                   = var.node_cpus
+  memory                     = var.node_memory
+  guest_id                   = data.vsphere_virtual_machine.node_template.guest_id
+  scsi_type                  = data.vsphere_virtual_machine.node_template.scsi_type
+  annotation                 = "Created on blah" #TODO: Add info here, date and source template
+  wait_for_guest_net_timeout = var.wait_for_guest_net_timeout
 
   disk {
     label            = "${var.node_prefix}${var.node_name}${count.index}$.vmd"
@@ -45,15 +47,19 @@ resource "vsphere_virtual_machine" "nodes" {
     thin_provisioned = data.vsphere_virtual_machine.node_template.disks.0.thin_provisioned
   }
 
-  network_interface {
-    network_id = data.vsphere_network.node_network.id
+  dynamic "network_interface" {
+    for_each = data.vsphere_network.node_network
+
+    content {
+      network_id = network_interface.value.id
+    }
   }
 
   clone {
     template_uuid = data.vsphere_virtual_machine.node_template.id
     #TODO: Complete this for non-cloud-init enabled templates like Windows
     dynamic "customize" {
-      for_each = var.cloud_init ? [] : [1]
+      for_each = var.customize_vm ? [1] : []
       content {
         linux_options {
           host_name = "${var.node_prefix}${var.node_name}${count.index}"
@@ -134,7 +140,7 @@ resource "vsphere_compute_cluster_vm_anti_affinity_rule" "node_anti_affinity" {
 }
 
 resource "dns_a_record_set" "a_record" {
-  count     = var.node_count
+  count     = var.add_dns_record ? var.node_count : 0
   zone      = "${var.node_domain_name}."
   name      = "${var.node_prefix}${var.node_name}${count.index}"
   addresses = ["${split("/", var.node_ips[count.index])[0]}"]

@@ -20,7 +20,7 @@ variable "vsphere_datastore" {
 
 variable "vsphere_network" {
   description = "The network to connect the node(s) to."
-  default     = "vlan14-servers"
+  default     = ["vlan14-servers"]
 }
 
 variable "vsphere_template" {
@@ -69,6 +69,7 @@ variable "node_network_interface" {
 }
 variable "node_initial_key" {
   description = "The initial SSH key to allow access to the node."
+  default     = ""
 }
 variable "node_domain_name" {
   description = "The domain name to assign to the node."
@@ -132,4 +133,19 @@ variable "cloud_pass" {
 variable "anti_affinity_enabled" {
   description = "Whether or not to enable the anti affinity rule for these nodes."
   default     = false
+}
+
+variable "add_dns_record" {
+  description = "Whether or not to add DNS records for each VM."
+  default     = true
+}
+
+variable "customize_vm" {
+  description = "Whether or not to use the customization process when deploying the VM."
+  default     = false
+}
+
+variable "wait_for_guest_net_timeout" {
+  description = "How long to wait for the guest network setup."
+  default     = 5
 }
