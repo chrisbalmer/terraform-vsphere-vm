@@ -1,44 +1,40 @@
 locals {
   vm = merge(var.default_vm, var.vm)
 }
-data "vsphere_datacenter" "node_dc" {
+
+data "vsphere_datacenter" "dc" {
   name = var.cluster_settings.datacenter
 }
 
-data "vsphere_compute_cluster" "node_cluster" {
-  name          = var.cluster_settings.cluster
-  datacenter_id = data.vsphere_datacenter.node_dc.id
-}
-
-data "vsphere_resource_pool" "node_pool" {
+data "vsphere_resource_pool" "pool" {
   name          = var.cluster_settings.pool
-  datacenter_id = data.vsphere_datacenter.node_dc.id
+  datacenter_id = data.vsphere_datacenter.dc.id
 }
 
-data "vsphere_datastore" "node_datastore" {
-  datacenter_id = data.vsphere_datacenter.node_dc.id
+data "vsphere_datastore" "datastore" {
+  datacenter_id = data.vsphere_datacenter.dc.id
   name          = local.vm.datastore
 }
 
-data "vsphere_network" "node_network" {
-  for_each      = local.vm.networks
-  datacenter_id = data.vsphere_datacenter.node_dc.id
-  name          = each.value.port_group
+data "vsphere_network" "networks" {
+  count         = length(local.vm.networks)
+  datacenter_id = data.vsphere_datacenter.dc.id
+  name          = local.vm.networks[count.index].port_group
 }
 
-data "vsphere_virtual_machine" "node_template" {
-  datacenter_id = data.vsphere_datacenter.node_dc.id
+data "vsphere_virtual_machine" "template" {
+  datacenter_id = data.vsphere_datacenter.dc.id
   name          = local.vm.template
 }
 
 resource "vsphere_virtual_machine" "vm" {
   name                       = local.vm.name
-  datastore_id               = data.vsphere_datastore.node_datastore.id
-  resource_pool_id           = data.vsphere_resource_pool.node_pool.id
+  datastore_id               = data.vsphere_datastore.datastore.id
+  resource_pool_id           = data.vsphere_resource_pool.pool.id
   num_cpus                   = local.vm.cpus
   memory                     = local.vm.memory
-  guest_id                   = data.vsphere_virtual_machine.node_template.guest_id
-  scsi_type                  = data.vsphere_virtual_machine.node_template.scsi_type
+  guest_id                   = data.vsphere_virtual_machine.template.guest_id
+  scsi_type                  = data.vsphere_virtual_machine.template.scsi_type
   annotation                 = "Created: ${timestamp()}\nTemplate: ${local.vm.template}"
   wait_for_guest_net_timeout = local.vm.network_timeout
 
@@ -49,14 +45,14 @@ resource "vsphere_virtual_machine" "vm" {
       label            = "${local.vm.name}.vmdk"
       size             = disk.value.size
       unit_number      = disk.key # This is the index of the disk in the list
-      eagerly_scrub    = disk.value.template ? data.vsphere_virtual_machine.node_template.disks.0.eagerly_scrub : disk.value.eagerly_scrub
-      thin_provisioned = disk.value.template ? data.vsphere_virtual_machine.node_template.disks.0.thin_provisioned : disk.value.thin
+      eagerly_scrub    = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.eagerly_scrub : disk.value.eagerly_scrub
+      thin_provisioned = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.thin_provisioned : disk.value.thin
 
     }
   }
 
   dynamic "network_interface" {
-    for_each = data.vsphere_network.node_network
+    for_each = data.vsphere_network.networks
 
     content {
       network_id = network_interface.value.id
@@ -64,7 +60,7 @@ resource "vsphere_virtual_machine" "vm" {
   }
 
   clone {
-    template_uuid = data.vsphere_virtual_machine.node_template.id
+    template_uuid = data.vsphere_virtual_machine.template.id
     #TODO: Complete this for non-cloud-init enabled templates like Windows
     dynamic "customize" {
       for_each = local.vm.customize ? [1] : []
@@ -88,14 +84,14 @@ resource "vsphere_virtual_machine" "vm" {
 
   # If using cloud-init and using a custom cloud-init setup then
   extra_config = local.vm.cloud_init ? (local.vm.cloud_init_custom ? {
-    "guestinfo.${local.vm.cloud_config_guestinfo_path}"          = "${base64encode("${data.template_file.userdata.rendered}")}"
+    "guestinfo.${local.vm.cloud_config_guestinfo_path}"          = base64encode(data.template_file.userdata.rendered)
     "guestinfo.${local.vm.cloud_config_guestinfo_encoding_path}" = "base64"
 
     # Else if using cloud-init and not using a custom cloud-init setup then
     } : {
-    "guestinfo.userdata"          = "${base64encode("${data.template_file.userdata.rendered}")}"
+    "guestinfo.userdata"          = base64encode(data.template_file.userdata.rendered)
     "guestinfo.userdata.encoding" = "base64"
-    "guestinfo.metadata"          = "${base64encode("${data.template_file.metadata.rendered}")}"
+    "guestinfo.metadata"          = base64encode(data.template_file.metadata.rendered)
     "guestinfo.metadata.encoding" = "base64"
 
     # Else we aren't using cloud-init so don't supply anything
@@ -103,7 +99,7 @@ resource "vsphere_virtual_machine" "vm" {
 }
 
 data "template_file" "userdata" {
-  template = "${file("${path.module}/files/${local.vm.cloud_config_template}")}"
+  template = file("${path.module}/files/${local.vm.cloud_config_template}")
 
   vars = {
     hostname          = local.vm.name
@@ -119,16 +115,16 @@ data "template_file" "userdata" {
 }
 
 data "template_file" "metadata" {
-  template = "${file("${path.module}/files/${local.vm.metadata_template}")}"
+  template = file("${path.module}/files/${local.vm.metadata_template}")
 
   vars = {
     hostname       = local.vm.name
-    network_config = "${base64encode("${data.template_file.network_config.rendered}")}"
+    network_config = base64encode(data.template_file.network_config.rendered)
   }
 }
 
 data "template_file" "network_config" {
-  template = "${file("${path.module}/files/${local.vm.network_config_template}")}"
+  template = file("${path.module}/files/${local.vm.network_config_template}")
 
   vars = {
     ip_address        = local.vm.networks[0].ipv4_address

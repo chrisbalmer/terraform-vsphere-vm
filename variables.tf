@@ -48,7 +48,7 @@ variable "default_vm" {
     networks        = []
     disks           = []
     datastore       = "vsanDatastore"
-    template        = "centos8-2020-06-10"
+    template        = "centos7-2020-12-19"
 
     customize                            = false
     cloud_init                           = true
