@@ -35,7 +35,7 @@ resource "vsphere_virtual_machine" "vm" {
   memory                     = local.vm.memory
   guest_id                   = data.vsphere_virtual_machine.template.guest_id
   scsi_type                  = data.vsphere_virtual_machine.template.scsi_type
-  annotation                 = "Created: ${timestamp()}\nTemplate: ${local.vm.template}"
+  annotation                 = "Last apply: ${timestamp()}\nTemplate: ${local.vm.template}"
   wait_for_guest_net_timeout = local.vm.network_timeout
 
   dynamic "disk" {
