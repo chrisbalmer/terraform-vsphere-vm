@@ -43,7 +43,7 @@ resource "vsphere_virtual_machine" "vm" {
 
     content {
       label            = "${local.vm.name}.vmdk"
-      size             = disk.value.size
+      size             = contains(keys(disk.value), "size") ? disk.value.size : data.vsphere_virtual_machine.template.disks.0.size
       unit_number      = disk.key # This is the index of the disk in the list
       eagerly_scrub    = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.eagerly_scrub : disk.value.eagerly_scrub
       thin_provisioned = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.thin_provisioned : disk.value.thin
