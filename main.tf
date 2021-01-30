@@ -42,7 +42,7 @@ resource "vsphere_virtual_machine" "vm" {
     for_each = local.vm.disks
 
     content {
-      label            = "${local.vm.name}.vmdk"
+      label            = contains(keys(disk.value), "name") ?  "${local.vm.name}-${disk.value.name}.vmdk" : "${local.vm.name}-${disk.key}.vmdk"
       size             = contains(keys(disk.value), "size") ? disk.value.size : data.vsphere_virtual_machine.template.disks.0.size
       unit_number      = disk.key # This is the index of the disk in the list
       eagerly_scrub    = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.eagerly_scrub : disk.value.eagerly_scrub
