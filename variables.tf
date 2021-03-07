@@ -74,8 +74,9 @@ variable "cluster_settings" {
   )
 }
 
-variable "initial_key" {
-  description = "The initial SSH key to allow access to the node."
+variable "ssh_keys" {
+  description = "SSH keys to add to the node."
+  type = list(string)
 }
 
 variable "cloud_user" {

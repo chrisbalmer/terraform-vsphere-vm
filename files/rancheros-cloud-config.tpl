@@ -1,7 +1,11 @@
 #cloud-config
 hostname: ${hostname}
 ssh_authorized_keys:
-  - ${initial_key}
+%{ for ssh_key in ssh_keys ~}
+  - ${ssh_key}
+%{ endfor ~}
+
+
 
 rancher:
   network:

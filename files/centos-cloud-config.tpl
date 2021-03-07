@@ -8,7 +8,9 @@ users:
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_authorized_keys:
-      - ${initial_key}
+%{ for ssh_key in ssh_keys ~}
+      - ${file(ssh_key)}
+%{ endfor ~}
 
 # grow the LVM partition (but not the VG or LV) on first boot
 growpart:

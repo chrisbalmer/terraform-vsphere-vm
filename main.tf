@@ -1,5 +1,18 @@
 locals {
   vm = merge(var.default_vm, var.vm)
+  userdata = templatefile("${path.module}/files/${local.vm.cloud_config_template}",
+    {
+      hostname          = local.vm.name,
+      ip_address        = local.vm.networks[0].ipv4_address,
+      gateway           = local.vm.gateway,
+      dns               = jsonencode(split(",", local.vm.networks[0].nameservers)),
+      network_interface = local.vm.networks[0].interface,
+      ssh_keys          = var.ssh_keys,
+      domain_name       = local.vm.domain,
+      cloud_user        = var.cloud_user,
+      cloud_pass        = var.cloud_pass,
+    }
+  )
 }
 
 data "vsphere_datacenter" "dc" {
@@ -84,34 +97,18 @@ resource "vsphere_virtual_machine" "vm" {
 
   # If using cloud-init and using a custom cloud-init setup then
   extra_config = local.vm.cloud_init ? (local.vm.cloud_init_custom ? {
-    "guestinfo.${local.vm.cloud_config_guestinfo_path}"          = base64encode(data.template_file.userdata.rendered)
+    "guestinfo.${local.vm.cloud_config_guestinfo_path}"          = base64encode(local.userdata)
     "guestinfo.${local.vm.cloud_config_guestinfo_encoding_path}" = "base64"
 
     # Else if using cloud-init and not using a custom cloud-init setup then
     } : {
-    "guestinfo.userdata"          = base64encode(data.template_file.userdata.rendered)
+    "guestinfo.userdata"          = base64encode(local.userdata)
     "guestinfo.userdata.encoding" = "base64"
     "guestinfo.metadata"          = base64encode(data.template_file.metadata.rendered)
     "guestinfo.metadata.encoding" = "base64"
 
     # Else we aren't using cloud-init so don't supply anything
   }) : {}
-}
-
-data "template_file" "userdata" {
-  template = file("${path.module}/files/${local.vm.cloud_config_template}")
-
-  vars = {
-    hostname          = local.vm.name
-    ip_address        = local.vm.networks[0].ipv4_address
-    gateway           = local.vm.gateway
-    dns               = jsonencode(split(",", local.vm.networks[0].nameservers))
-    network_interface = local.vm.networks[0].interface
-    initial_key       = var.initial_key
-    domain_name       = local.vm.domain
-    cloud_user        = var.cloud_user
-    cloud_pass        = var.cloud_pass
-  }
 }
 
 data "template_file" "metadata" {
