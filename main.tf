@@ -13,6 +13,14 @@ locals {
       cloud_pass        = var.cloud_pass,
     }
   )
+  tags = flatten([
+    for group in keys(local.vm.tags) : [
+      for tag in local.vm.tags[group] : {
+        group = group
+        tag   = tag
+      }
+    ]
+  ])
 }
 
 data "vsphere_datacenter" "dc" {
@@ -49,13 +57,14 @@ resource "vsphere_virtual_machine" "vm" {
   guest_id                   = data.vsphere_virtual_machine.template.guest_id
   scsi_type                  = data.vsphere_virtual_machine.template.scsi_type
   annotation                 = "Last apply: ${timestamp()}\nTemplate: ${local.vm.template}"
+  tags                       = data.vsphere_tag.tag.*.id
   wait_for_guest_net_timeout = local.vm.network_timeout
 
   dynamic "disk" {
     for_each = local.vm.disks
 
     content {
-      label            = contains(keys(disk.value), "name") ?  "${local.vm.name}-${disk.value.name}.vmdk" : "${local.vm.name}-${disk.key}.vmdk"
+      label            = contains(keys(disk.value), "name") ? "${local.vm.name}-${disk.value.name}.vmdk" : "${local.vm.name}-${disk.key}.vmdk"
       size             = contains(keys(disk.value), "size") ? disk.value.size : data.vsphere_virtual_machine.template.disks.0.size
       unit_number      = disk.key # This is the index of the disk in the list
       eagerly_scrub    = disk.value.template ? data.vsphere_virtual_machine.template.disks.0.eagerly_scrub : disk.value.eagerly_scrub
@@ -130,4 +139,15 @@ data "template_file" "network_config" {
     dns               = jsonencode(split(",", local.vm.networks[0].nameservers))
     domain_name       = local.vm.domain
   }
+}
+
+data "vsphere_tag_category" "category" {
+  for_each = local.vm.tags
+  name     = each.key
+}
+
+data "vsphere_tag" "tag" {
+  count       = length(local.tags)
+  name        = local.tags[count.index]["tag"]
+  category_id = data.vsphere_tag_category.category[local.tags[count.index]["group"]].id
 }

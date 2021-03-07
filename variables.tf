@@ -37,6 +37,7 @@ variable "default_vm" {
       cloud_config_guestinfo_encoding_path = string
       cpus                                 = number
       memory                               = number
+      tags                                 = map(list(string))
     }
   )
 
@@ -61,6 +62,8 @@ variable "default_vm" {
 
     cpus   = 2
     memory = 4096
+
+    tags = {}
   }
 }
 
@@ -76,7 +79,7 @@ variable "cluster_settings" {
 
 variable "ssh_keys" {
   description = "SSH keys to add to the node."
-  type = list(string)
+  type        = list(string)
 }
 
 variable "cloud_user" {
