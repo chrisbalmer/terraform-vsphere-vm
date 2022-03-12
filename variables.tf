@@ -27,16 +27,11 @@ variable "default_vm" {
       datastore = string
       template  = string
 
-      customize                            = bool
-      cloud_init                           = bool
-      cloud_init_custom                    = bool
-      cloud_config_template                = string
+      userdata_template                    = string
       metadata_template                    = string
-      network_config_template              = string
-      cloud_config_guestinfo_path          = string
-      cloud_config_guestinfo_encoding_path = string
       cpus                                 = number
       memory                               = number
+      firmware                             = string
       tags                                 = map(list(string))
     }
   )
@@ -51,17 +46,12 @@ variable "default_vm" {
     datastore       = "vsanDatastore"
     template        = "centos7-2020-12-19"
 
-    customize                            = false
-    cloud_init                           = true
-    cloud_init_custom                    = false
-    cloud_config_template                = "centos-cloud-config.tpl"
+    userdata_template                    = "centos-cloud-config.tpl"
     metadata_template                    = "centos-metadata.tpl"
-    network_config_template              = "centos-network-config.tpl"
-    cloud_config_guestinfo_path          = "cloud-init.config.data"
-    cloud_config_guestinfo_encoding_path = "cloud-init.data.encoding"
 
     cpus   = 2
     memory = 4096
+    firmware = "efi"
 
     tags = {}
   }

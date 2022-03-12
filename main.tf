@@ -1,6 +1,6 @@
 locals {
   vm = merge(var.default_vm, var.vm)
-  userdata = templatefile("${path.module}/files/${local.vm.cloud_config_template}",
+  userdata = templatefile("${path.module}/files/${local.vm.userdata_template}",
     {
       hostname          = local.vm.name,
       ip_address        = local.vm.networks[0].ipv4_address,
@@ -11,6 +11,16 @@ locals {
       domain_name       = local.vm.domain,
       cloud_user        = var.cloud_user,
       cloud_pass        = var.cloud_pass,
+    }
+  )
+  metadata = templatefile("${path.module}/files/${local.vm.metadata_template}",
+    {
+      hostname          = local.vm.name,
+      ip_address        = local.vm.networks[0].ipv4_address,
+      gateway           = local.vm.gateway,
+      network_interface = local.vm.networks[0].interface,
+      dns               = jsonencode(split(",", local.vm.networks[0].nameservers)),
+      domain_name       = local.vm.domain,
     }
   )
   tags = flatten([
@@ -59,7 +69,7 @@ resource "vsphere_virtual_machine" "vm" {
   annotation                 = "Last apply: ${timestamp()}\nTemplate: ${local.vm.template}"
   tags                       = data.vsphere_tag.tag.*.id
   wait_for_guest_net_timeout = local.vm.network_timeout
-
+  firmware                   = local.vm.firmware
   dynamic "disk" {
     for_each = local.vm.disks
 
@@ -83,61 +93,20 @@ resource "vsphere_virtual_machine" "vm" {
 
   clone {
     template_uuid = data.vsphere_virtual_machine.template.id
-    #TODO: Complete this for non-cloud-init enabled templates like Windows
-    dynamic "customize" {
-      for_each = local.vm.customize ? [1] : []
-      content {
-        linux_options {
-          host_name = local.vm.name
-          domain    = local.vm.domain
-        }
-
-        dynamic "network_interface" {
-          for_each = local.vm.networks
-          content {
-            ipv4_address = network_interface.value.ipv4_address
-          }
-        }
-
-        ipv4_gateway = local.vm.gateway
-      }
-    }
   }
 
-  # If using cloud-init and using a custom cloud-init setup then
-  extra_config = local.vm.cloud_init ? (local.vm.cloud_init_custom ? {
-    "guestinfo.${local.vm.cloud_config_guestinfo_path}"          = base64encode(local.userdata)
-    "guestinfo.${local.vm.cloud_config_guestinfo_encoding_path}" = "base64"
+  lifecycle {
+    ignore_changes = [
+      clone[0].template_uuid,
+      extra_config,
+    ]
+  }
 
-    # Else if using cloud-init and not using a custom cloud-init setup then
-    } : {
+  extra_config = {
     "guestinfo.userdata"          = base64encode(local.userdata)
     "guestinfo.userdata.encoding" = "base64"
-    "guestinfo.metadata"          = base64encode(data.template_file.metadata.rendered)
+    "guestinfo.metadata"          = base64encode(local.metadata)
     "guestinfo.metadata.encoding" = "base64"
-
-    # Else we aren't using cloud-init so don't supply anything
-  }) : {}
-}
-
-data "template_file" "metadata" {
-  template = file("${path.module}/files/${local.vm.metadata_template}")
-
-  vars = {
-    hostname       = local.vm.name
-    network_config = base64encode(data.template_file.network_config.rendered)
-  }
-}
-
-data "template_file" "network_config" {
-  template = file("${path.module}/files/${local.vm.network_config_template}")
-
-  vars = {
-    ip_address        = local.vm.networks[0].ipv4_address
-    gateway           = local.vm.gateway
-    network_interface = local.vm.networks[0].interface
-    dns               = jsonencode(split(",", local.vm.networks[0].nameservers))
-    domain_name       = local.vm.domain
   }
 }
 
