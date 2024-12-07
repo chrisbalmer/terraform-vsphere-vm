@@ -8,7 +8,7 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh_authorized_keys:
 %{ for ssh_key in ssh_keys ~}
-      - ${file(ssh_key)}
+      - ${ssh_key}
 %{ endfor ~}
 
 growpart:

@@ -1,6 +1,7 @@
 locals {
   vm = merge(var.default_vm, var.vm)
-  userdata = templatefile("${path.module}/files/${local.vm.userdata_template}",
+  userdata_template = "${var.userdata_template != "" ? var.userdata_template : "${path.module}/files/${local.vm.userdata_template}"}"
+  userdata = var.userdata != "" ? var.userdata : templatefile(local.userdata_template,
     {
       hostname          = local.vm.name,
       ip_address        = local.vm.networks[0].ipv4_address,
@@ -11,6 +12,7 @@ locals {
       domain_name       = local.vm.domain,
       cloud_user        = var.cloud_user,
       cloud_pass        = var.cloud_pass,
+      file_data         = var.file_data,
     }
   )
   metadata = templatefile("${path.module}/files/${local.vm.metadata_template}",

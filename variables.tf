@@ -70,6 +70,7 @@ variable "cluster_settings" {
 variable "ssh_keys" {
   description = "SSH keys to add to the node."
   type        = list(string)
+  default = []
 }
 
 variable "cloud_user" {
@@ -79,4 +80,23 @@ variable "cloud_user" {
 
 variable "cloud_pass" {
   description = "Initial user hashed password for the node."
+  default = ""
+}
+
+variable "userdata_template" {
+  default = ""
+}
+
+variable "userdata" {
+  default = ""
+}
+
+variable "file_data" {
+  type = list(object(
+    {
+      filename = string
+      contents = string
+    }
+  ))
+  default = []
 }
